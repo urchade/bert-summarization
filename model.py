@@ -48,6 +48,18 @@ class TransformerExt(nn.Module):
         return out
 
 
+@torch.no_grad()
+def compute_accuracy(outputs, y, mask):
+    predicted = (outputs > 0.5).float() * 1
+    acc = ((predicted == y).float() * mask).sum()
+    return acc / mask.sum()
+
+
+def compute_loss(outputs, y, mask):
+    masked_loss = bce_loss(outputs, y.float(), reduction='none') * mask  # (batch_size, max_len)
+    return masked_loss.sum() / mask.sum()
+
+
 class BertExtSum(nn.Module):
     def __init__(self, bert_model, add_transformer_layers, n_head,
                  num_layers):
@@ -75,28 +87,22 @@ class BertExtSum(nn.Module):
 
         # For every token, we have a probability but we are only interested by [CLS] tokens
         # compute the loss
-        masked_loss = bce_loss(y_hat, y.float(), reduction='none') * mask_cls  # (batch_size, max_len)
-        masked_loss = masked_loss.sum() / mask_cls.sum()  # reduction
-
-        masked_acc = self.compute_accuracy(y_hat, y, mask_cls)
+        masked_loss = compute_loss(y_hat, y, mask_cls)
+        masked_acc = compute_accuracy(y_hat, y, mask_cls)
 
         return y_hat, masked_loss, masked_acc
 
-    @torch.no_grad()
-    def compute_accuracy(self, outputs, y, mask):
-        predicted = (outputs > 0.5).float() * 1
-        acc = ((predicted == y).float() * mask).sum()
-        return acc / mask.sum()
 
-
-class Baseline(nn.Module):
+class BaselineFFN(nn.Module):
     def __init__(self, bert_model):
         super().__init__()
 
         bert = AutoModel.from_pretrained(bert_model)
 
         self.embedding = bert.embeddings.word_embeddings
-        nn.init.uniform(self.embedding.weight.data)
+
+        nn.init.xavier_normal(self.embedding.weight.data)
+
         self.hidden_size = bert.config.hidden_size
 
         self.fc = nn.Sequential(nn.Linear(self.hidden_size, 1),
@@ -104,18 +110,9 @@ class Baseline(nn.Module):
 
     def forward(self, x, y, mask_cls, pad_mask=None, segments=None):
         x = self.embedding(x)
-        x = self.fc(x)
-        y_hat = x.squeeze(-1)
+        x = self.fc(x).squeeze(-1)
 
-        masked_loss = bce_loss(y_hat, y.float(), reduction='none') * mask_cls
-        masked_loss = masked_loss.sum() / mask_cls.sum()
+        masked_loss = compute_loss(x, y, mask_cls)
+        masked_acc = compute_accuracy(x, y, mask_cls)
 
-        masked_acc = self.compute_accuracy(y_hat, y, mask_cls)
-
-        return y_hat, masked_loss, masked_acc
-
-    @torch.no_grad()
-    def compute_accuracy(self, outputs, y, mask):
-        predicted = (outputs > 0.5).float() * 1
-        acc = ((predicted == y).float() * mask).sum()
-        return acc / mask.sum()
+        return x, masked_loss, masked_acc

@@ -7,7 +7,7 @@ import torch
 from transformers import AutoTokenizer
 
 from dataset import ExtDataset
-from model import BertExtSum, Baseline
+from model import BertExtSum, BaselineFFN
 
 
 def train(model, optimizer, train_loader, valid_loader=None, evaluate_every=50, max_step=10):
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     v_loader = DataLoader(valid, batch_size=int(args.val_Bs))
 
     if args.baseline:
-        model = Baseline(bert_model=args.bert_model)
+        model = BaselineFFN(bert_model=args.bert_model)
     else:
         model = BertExtSum(bert_model=args.bert_model,
                            add_transformer_layers=args.add_transformer_layers,

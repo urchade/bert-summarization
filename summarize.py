@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 import numpy as np
 from dataset import ExtDataset
-from model import BertExtSum, Baseline
+from model import BertExtSum, BaselineFFN
 from operator import itemgetter
 
 # @torch.no_grad()
@@ -40,10 +40,10 @@ from operator import itemgetter
 #             f.write(text_summary)
 #             f.write('\n')
 
-model = Baseline(bert_model='camembert-base',
-                 add_transformer_layers=False,
-                 n_head=0,
-                 num_layers=0)
+model = BaselineFFN(bert_model='camembert-base',
+                    add_transformer_layers=False,
+                    n_head=0,
+                    num_layers=0)
 
 model.load_state_dict(torch.load('model.pt'))
 
