@@ -87,3 +87,35 @@ class BertExtSum(nn.Module):
         predicted = (outputs > 0.5).float() * 1
         acc = ((predicted == y).float() * mask).sum()
         return acc / mask.sum()
+
+
+class Baseline(nn.Module):
+    def __init__(self, bert_model):
+        super().__init__()
+
+        bert = AutoModel.from_pretrained(bert_model)
+
+        self.embedding = bert.embeddings.word_embeddings
+        nn.init.uniform(self.embedding.weight.data)
+        self.hidden_size = bert.config.hidden_size
+
+        self.fc = nn.Sequential(nn.Linear(self.hidden_size, 1),
+                                nn.Sigmoid())
+
+    def forward(self, x, y, mask_cls, pad_mask=None, segments=None):
+        x = self.embedding(x)
+        x = self.fc(x)
+        y_hat = x.squeeze(-1)
+
+        masked_loss = bce_loss(y_hat, y.float(), reduction='none') * mask_cls
+        masked_loss = masked_loss.sum() / mask_cls.sum()
+
+        masked_acc = self.compute_accuracy(y_hat, y, mask_cls)
+
+        return y_hat, masked_loss, masked_acc
+
+    @torch.no_grad()
+    def compute_accuracy(self, outputs, y, mask):
+        predicted = (outputs > 0.5).float() * 1
+        acc = ((predicted == y).float() * mask).sum()
+        return acc / mask.sum()

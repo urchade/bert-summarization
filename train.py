@@ -7,7 +7,7 @@ import torch
 from transformers import AutoTokenizer
 
 from dataset import ExtDataset
-from model import BertExtSum
+from model import BertExtSum, Baseline
 
 
 def train(model, optimizer, train_loader, valid_loader=None, evaluate_every=50, max_step=10):
@@ -81,6 +81,8 @@ def get_parser():
                         default=1)
     parser.add_argument("--n_head", help='Number of head of the transformer layers',
                         default=4)
+    parser.add_argument("--baseline", help='If run baseline',
+                        default=False)
     return parser
 
 
@@ -88,20 +90,20 @@ if __name__ == "__main__":
     parser = get_parser()
     args = parser.parse_args()
 
-    print("Load tokenizer")
     tokenizer = AutoTokenizer.from_pretrained(args.bert_model)
 
-    print("Create dataset")
     data = ExtDataset(tokenizer, path=args.train_path)
     valid = ExtDataset(tokenizer, path=args.valid_path)
 
     loader = DataLoader(data, batch_size=int(args.train_Bs))
     v_loader = DataLoader(valid, batch_size=int(args.val_Bs))
 
-    print("Instantiate model")
-    model = BertExtSum(bert_model=args.bert_model,
-                       add_transformer_layers=args.add_transformer_layers,
-                       num_layers=int(args.num_layers), n_head=int(args.n_head))
+    if args.baseline:
+        model = Baseline(bert_model=args.bert_model)
+    else:
+        model = BertExtSum(bert_model=args.bert_model,
+                           add_transformer_layers=args.add_transformer_layers,
+                           num_layers=int(args.num_layers), n_head=int(args.n_head))
 
     opt = torch.optim.Adam(model.parameters(), lr=float(args.lr))
 
