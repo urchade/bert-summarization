@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 import numpy as np
 from dataset import ExtDataset
-from model import BertExtSum, BaselineFFN
+from model import BaselineEXT
 from operator import itemgetter
 
 # @torch.no_grad()
@@ -40,26 +40,30 @@ from operator import itemgetter
 #             f.write(text_summary)
 #             f.write('\n')
 
-model = BaselineFFN(bert_model='camembert-base',
-                    add_transformer_layers=False,
-                    n_head=0,
-                    num_layers=0)
-
-model.load_state_dict(torch.load('model.pt'))
-
-model.eval()
-# model.load_state_dict(args.state_dict["model"])
 tokenizer = AutoTokenizer.from_pretrained('camembert-base')
 
-valid = ExtDataset(tokenizer, path=r'french_data\valid')
+mod = BaselineEXT(num_emb=tokenizer.vocab_size,
+                            emb_dim=768,
+                            n_head=4,
+                            num_layers=1)
+
+mod.load_state_dict(torch.load('model_step_500.pt'))
+
+mod.eval()
+# model.load_state_dict(args.state_dict["model"])
+
+
+valid = ExtDataset(tokenizer, path=r'data_french\preprocessed', train=False)
 loader = DataLoader(valid, batch_size=1, shuffle=False)
 
-for i, (x, y, cls_mask, att_mask, _, text) in enumerate(loader):
-    y_hat, _, _ = model(x, y, cls_mask, att_mask)
+for i, (x, y, cls_mask, att_mask, seg, text) in enumerate(loader):
+    y_hat, _, _ = mod(x, y, cls_mask, att_mask, seg)
     cls_ids = np.argwhere(cls_mask.numpy().squeeze()).squeeze()
-    top_sentences = torch.topk((y_hat * cls_mask).squeeze(), k=3)[1]
+    bl = y_hat * cls_mask
+    top_sentences = torch.topk((y_hat * cls_mask).squeeze(), k=2)[1]
     top_sentences = top_sentences.numpy().squeeze()
 
+    true_sum = np.argwhere(y.numpy().squeeze())
     summary_id = []
     for j, idx in enumerate(cls_ids):
         summary_id.append(j) if idx in top_sentences else 0
@@ -70,5 +74,5 @@ for i, (x, y, cls_mask, att_mask, _, text) in enumerate(loader):
 
     import numpy as np
 
-    if np.random.uniform(0, 1) > 0.95:
+    if 3 in summary_id:
         break

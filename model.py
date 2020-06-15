@@ -42,8 +42,13 @@ class TransformerExt(nn.Module):
             seg_emb = self.position_embeddings(segments)
             x = x + seg_emb
 
-        # pd mask have to if shape (seq_len, batch_size)
-        out = self.transformer_encoder(x, src_key_padding_mask=pad_mask.transpose(1, 0))
+        # pd mask have be of shape (seq_len, batch_size)
+        if pad_mask is not None:
+            pad_mask = pad_mask.transpose(1, 0)
+
+        # we can also add a layerNorm
+
+        out = self.transformer_encoder(x, src_key_padding_mask=pad_mask)
 
         return out
 
@@ -56,7 +61,7 @@ def compute_accuracy(outputs, y, mask):
 
 
 def compute_loss(outputs, y, mask):
-    masked_loss = bce_loss(outputs, y.float(), reduction='none') * mask  # (batch_size, max_len)
+    masked_loss = bce_loss(outputs, y.float(), reduction='none') * mask.float()  # (batch_size, max_len)
     return masked_loss.sum() / mask.sum()
 
 
@@ -78,7 +83,8 @@ class BertExtSum(nn.Module):
     def forward(self, x, y, mask_cls, pad_mask=None, segments=None):
 
         # The first element corresponds to the final representation of all tokens
-        x = self.bert(x, attention_mask=pad_mask)[0]  # (batch_size, max_len, hidden_size)
+        x = self.bert(x, attention_mask=pad_mask, token_type_ids=segments)[0]  # (batch_size, max_len, hidden_size)
+
         if self.add_transformer_layers:
             x = self.intermediate_layer(x, pad_mask=pad_mask)  # (batch_size, max_len, hidden_size)
 
@@ -87,32 +93,30 @@ class BertExtSum(nn.Module):
 
         # For every token, we have a probability but we are only interested by [CLS] tokens
         # compute the loss
-        masked_loss = compute_loss(y_hat, y, mask_cls)
-        masked_acc = compute_accuracy(y_hat, y, mask_cls)
+        loss = compute_loss(y_hat, y, mask_cls)
+        accuracy = compute_accuracy(y_hat, y, mask_cls)
 
-        return y_hat, masked_loss, masked_acc
+        return y_hat, loss, accuracy
 
 
-class BaselineFFN(nn.Module):
-    def __init__(self, bert_model):
+class BaselineEXT(nn.Module):
+    def __init__(self, num_emb, emb_dim, n_head, num_layers):
         super().__init__()
 
-        bert = AutoModel.from_pretrained(bert_model)
+        self.embedding = nn.Embedding(num_emb, emb_dim)
 
-        self.embedding = bert.embeddings.word_embeddings
+        self.transformer = TransformerExt(emb_dim, n_head, num_layers)
 
-        nn.init.xavier_normal(self.embedding.weight.data)
-
-        self.hidden_size = bert.config.hidden_size
-
-        self.fc = nn.Sequential(nn.Linear(self.hidden_size, 1),
+        self.fc = nn.Sequential(nn.Linear(emb_dim, 1),
                                 nn.Sigmoid())
 
     def forward(self, x, y, mask_cls, pad_mask=None, segments=None):
+
         x = self.embedding(x)
-        x = self.fc(x).squeeze(-1)
+        x = self.transformer(x, pad_mask=pad_mask, segments=segments)
+        y_hat = self.fc(x).squeeze(-1)
+        loss = compute_loss(y_hat, y, mask_cls)
+        accuracy = compute_accuracy(y_hat, y, mask_cls)
 
-        masked_loss = compute_loss(x, y, mask_cls)
-        masked_acc = compute_accuracy(x, y, mask_cls)
+        return y_hat, loss, accuracy
 
-        return x, masked_loss, masked_acc
