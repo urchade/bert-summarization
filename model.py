@@ -7,7 +7,7 @@ from transformers import AutoModel
 N_MAX_POSITIONS = 512
 
 
-def create_sinusoidal_embeddings(n_pos, dim, out): # Same as (Vaswani et al., 2017°
+def create_sinusoidal_embeddings(n_pos, dim, out): # Same as (Vaswani et al., 2017)
     position_enc = np.array([
         [pos / np.power(10000, 2 * (j // 2) / dim) for j in range(dim)]
         for pos in range(n_pos)
