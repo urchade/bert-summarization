@@ -8,16 +8,11 @@ from tqdm import tqdm
 
 
 class ExtDataset(Dataset):
-    def __init__(self, tokenizer, path, train=True):
+    def __init__(self, tokenizer, path):
 
         self.tokenizer = tokenizer
 
         data = glob.glob(os.path.join(rf'{path}', r'**\*.txt'), recursive=True)
-
-        # if train:
-        #     data = data[:10000]
-        # else:
-        #     data = data[-1000:]
 
         text = []  # variable to store text
         all_inputs = []

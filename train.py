@@ -37,6 +37,9 @@ def train(network, optimizer, train_loader, valid_loader=None, evaluate_every=50
 
             step += 1
 
+            if step > max_step:
+                break
+
             print(f'train mean loss = {np.mean(train_losses[-1])}')
             print(f'train mean acc = {np.mean(train_accuracy[-1])}')
 
@@ -67,17 +70,17 @@ def train(network, optimizer, train_loader, valid_loader=None, evaluate_every=50
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bert_model", help='Name of the model',
-                        default='camembert-base')
+                        default='bert-base-multilingual-uncased')
     parser.add_argument("--device", help='Device name',
                         default='cpu')
     parser.add_argument("--train_path", help='Path of the training data folder',
-                        default=r'data_french\preprocessed')
+                        default=r'sample_data\train')
     parser.add_argument("--valid_path", help='Path of the validation data folder',
-                        default=r'data_french\preprocessed')
+                        default=r'sample_data\valid')
     parser.add_argument("--max_step", help='Maximum number of step',
-                        default=60)
+                        default=200)
     parser.add_argument("--evaluate_every", help='',
-                        default=20)
+                        default=50)
     parser.add_argument("--lr", help='Learning rate',
                         default=1e-3)
     parser.add_argument("--train_Bs", help='Training batch size',
@@ -92,10 +95,6 @@ def get_parser():
                         default=4)
     parser.add_argument("--baseline", help='If run baseline',
                         default=False)
-    parser.add_argument("--train_size", help='If run baseline',
-                        default=5000)
-    parser.add_argument("--valid_size", help='If run baseline',
-                        default=500)
     return parser
 
 
@@ -106,14 +105,14 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained(args.bert_model)
 
     data = ExtDataset(tokenizer, path=args.train_path)
-    valid = ExtDataset(tokenizer, path=args.valid_path, train=False)
+    valid = ExtDataset(tokenizer, path=args.valid_path)
 
     loader = DataLoader(data, batch_size=int(args.train_Bs))
     v_loader = DataLoader(valid, batch_size=int(args.val_Bs))
 
     if args.baseline:
         model = BaselineEXT(num_emb=tokenizer.vocab_size,
-                            emb_dim=768,
+                            emb_dim=64,
                             n_head=int(args.n_head),
                             num_layers=int(args.num_layers)).to(device=args.device)
     else:
