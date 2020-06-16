@@ -4,4 +4,7 @@ My presentation for **Extractive Text summarization with BERT** in the **NLP wit
 
 ## References
 
+Nallapati, Ramesh et al. “SummaRuNNer: A Recurrent Neural Network Based Sequence Model for Extractive Summarization of Documents.” AAAI (2017). <br>
+
+
 
